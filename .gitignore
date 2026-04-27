@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 用户私人状态: tracked 历史 / 已读标记 (每次运行都会变)
+state.json
+
+# 浮窗点击时重新生成的报告
+report.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Windows
+Thumbs.db
+desktop.ini
