@@ -232,7 +232,11 @@ def must_apply_tag(profit_mid: float) -> str:
 # ---------- 调试用 mock 数据 ----------
 def mock_today() -> List[Dict[str, Any]]:
     """生成假数据用于排版调试 / 离线演示"""
-    today = datetime.date.today().isoformat() + " 00:00:00"
+    d = datetime.date.today()
+    today = d.isoformat() + " 00:00:00"
+    # 中签号公布日(T+2) / 缴款日(T+3): 相对今天动态生成, 避免写死日期与"今天"矛盾
+    result_d = (d + datetime.timedelta(days=2)).isoformat() + " 00:00:00"
+    pay_d = (d + datetime.timedelta(days=3)).isoformat() + " 00:00:00"
     samples = [
         {  # 大肉签 - 科创板半导体
             "SECURITY_CODE": "688999", "APPLY_CODE": "787999",
@@ -242,8 +246,8 @@ def mock_today() -> List[Dict[str, Any]]:
             "AFTER_ISSUE_PE": 65.2, "EACHBALLOT_SHARES": "500",
             "ONLINE_APPLY_UPPER": 9000, "PREDICT_ONFUND_UPPER": 799920,
             "PREDICT_RAISE_FUNDS": 24.6, "TOP_APPLY_MARKETCAP": 9.0,
-            "APPLY_DATE": today, "BALLOT_NUM_DATE": "2026-04-29 00:00:00",
-            "BALLOT_PAY_DATE": "2026-04-30 00:00:00",
+            "APPLY_DATE": today, "BALLOT_NUM_DATE": result_d,
+            "BALLOT_PAY_DATE": pay_d,
             "MAIN_BUSINESS": "高端芯片设计与制造,聚焦人工智能算力芯片",
             "STAR_SIGN": "5", "RECOMMEND_ORG": "中信证券",
         },
@@ -255,8 +259,8 @@ def mock_today() -> List[Dict[str, Any]]:
             "AFTER_ISSUE_PE": 22.1, "EACHBALLOT_SHARES": "500",
             "ONLINE_APPLY_UPPER": 7500, "PREDICT_ONFUND_UPPER": 114750,
             "PREDICT_RAISE_FUNDS": 8.5, "TOP_APPLY_MARKETCAP": 7.5,
-            "APPLY_DATE": today, "BALLOT_NUM_DATE": "2026-04-29 00:00:00",
-            "BALLOT_PAY_DATE": "2026-04-30 00:00:00",
+            "APPLY_DATE": today, "BALLOT_NUM_DATE": result_d,
+            "BALLOT_PAY_DATE": pay_d,
             "MAIN_BUSINESS": "工业自动化设备的研发、生产与销售",
             "STAR_SIGN": "3", "RECOMMEND_ORG": "国泰君安",
         },
@@ -268,8 +272,8 @@ def mock_today() -> List[Dict[str, Any]]:
             "AFTER_ISSUE_PE": 18.5, "EACHBALLOT_SHARES": "100",
             "ONLINE_APPLY_UPPER": 100000, "PREDICT_ONFUND_UPPER": 680000,
             "PREDICT_RAISE_FUNDS": 1.8, "TOP_APPLY_MARKETCAP": 0,
-            "APPLY_DATE": today, "BALLOT_NUM_DATE": "2026-04-29 00:00:00",
-            "BALLOT_PAY_DATE": "2026-04-30 00:00:00",
+            "APPLY_DATE": today, "BALLOT_NUM_DATE": result_d,
+            "BALLOT_PAY_DATE": pay_d,
             "MAIN_BUSINESS": "MEMS传感器芯片的设计与封装测试",
             "IS_BEIJING": 1, "STAR_SIGN": "2", "RECOMMEND_ORG": "申万宏源",
         },
