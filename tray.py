@@ -18,6 +18,7 @@
 import datetime
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -330,6 +331,21 @@ class TrayApp(QtCore.QObject):
             self.tray.hide()
 
 
+def _wait_for_tray(timeout_s: int = 120) -> bool:
+    """开机自启时, 任务栏托盘区(通知区域)常常还没初始化好,
+    isSystemTrayAvailable() 会瞬时返回 False -> 进程直接退出 = "开机没启动"。
+    这里轮询等待最多 timeout_s 秒, 给系统留出初始化时间, 根治开机竞态。"""
+    if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
+        return True
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        QtWidgets.QApplication.processEvents()
+        time.sleep(1.0)
+        if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
+            return True
+    return False
+
+
 def run():
     use_mock = "--mock" in sys.argv
     force = "--force" in sys.argv
@@ -337,7 +353,7 @@ def run():
     app = QtWidgets.QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    if not QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
+    if not _wait_for_tray():
         QtWidgets.QMessageBox.critical(None, "新股申购提醒", "当前系统没有可用的托盘区，无法常驻。")
         return
 
