@@ -16,20 +16,59 @@
 左键随时可点开报告。
 """
 import datetime
+import os
 import sys
 import threading
 import time
+import traceback
 import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(ROOT))
 
-from PySide6 import QtCore, QtGui, QtWidgets
+LOG_FILE = ROOT / "tray.log"
 
-import fetcher
-import report
-import main as core  # 复用 load_state/save_state/today_iso/_track_today/_collect_reviews/Floater
+
+def _log(msg: str) -> None:
+    """写一行带时间戳的日志。pythonw 无控制台, 所有诊断都落到 tray.log。"""
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.datetime.now():%Y-%m-%d %H:%M:%S}] {msg}\n")
+    except Exception:
+        pass
+
+
+def _setup_crash_logging() -> None:
+    """pythonw 下 stderr 为 None, 未捕获异常会无声崩溃。把主线程/子线程的
+    未捕获异常都写进 tray.log, 这样开机失败也能查到根因。"""
+    def _hook(exc_type, exc, tb):
+        _log("UNCAUGHT 主线程异常:\n" + "".join(
+            traceback.format_exception(exc_type, exc, tb)))
+    sys.excepthook = _hook
+
+    def _thook(args):
+        _log("UNCAUGHT 子线程异常:\n" + "".join(
+            traceback.format_exception(args.exc_type, args.exc_value,
+                                       args.exc_traceback)))
+    try:
+        threading.excepthook = _thook
+    except Exception:
+        pass
+
+
+_setup_crash_logging()
+_log(f"=== 进程启动 argv={sys.argv} cwd={os.getcwd()} exe={sys.executable} ===")
+
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+
+    import fetcher
+    import report
+    import main as core  # 复用 load_state/save_state/today_iso/_track_today/_collect_reviews/Floater
+except Exception:
+    _log("导入依赖失败:\n" + traceback.format_exc())
+    raise
 
 REPORT_FILE = ROOT / "report.html"
 
@@ -227,6 +266,7 @@ class TrayApp(QtCore.QObject):
         thread.start()
 
     def _on_checked(self, todays: list, reviews: list, auto: bool):
+        _log(f"检查完成 auto={auto} 今日={len(todays)} 待回顾={len(reviews)}")
         self.todays = todays
         self.reviews = reviews
         state = core.load_state()
@@ -337,12 +377,17 @@ def _wait_for_tray(timeout_s: int = 120) -> bool:
     这里轮询等待最多 timeout_s 秒, 给系统留出初始化时间, 根治开机竞态。"""
     if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
         return True
+    _log("托盘区暂不可用, 开始轮询等待…")
     deadline = time.monotonic() + timeout_s
+    waited = 0
     while time.monotonic() < deadline:
         QtWidgets.QApplication.processEvents()
         time.sleep(1.0)
+        waited += 1
         if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
+            _log(f"托盘区在等待 {waited}s 后就绪")
             return True
+    _log(f"等待 {timeout_s}s 后托盘区仍不可用, 放弃")
     return False
 
 
@@ -352,12 +397,16 @@ def run():
 
     app = QtWidgets.QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+    _log("QApplication 已创建, 开始等待托盘区就绪")
 
-    if not _wait_for_tray():
+    avail = _wait_for_tray()
+    _log(f"托盘区可用 = {avail}")
+    if not avail:
         QtWidgets.QMessageBox.critical(None, "新股申购提醒", "当前系统没有可用的托盘区，无法常驻。")
         return
 
     tray = TrayApp(app, use_mock, force)  # noqa: F841 (持有引用防回收)
+    _log("TrayApp 已创建, 图标应已显示, 进入事件循环")
     sys.exit(app.exec())
 
 
