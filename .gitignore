@@ -9,6 +9,10 @@ state.json
 # 浮窗点击时重新生成的报告
 report.html
 
+# 诊断日志 (托盘启动 / 崩溃记录)
+tray.log
+startup.log
+
 # IDE
 .vscode/
 .idea/
