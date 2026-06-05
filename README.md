@@ -8,8 +8,8 @@
 | `main.py` | 入口 + 浮窗 + 状态管理 |
 | `fetcher.py` | 拉东方财富新股申购数据 + 收益估算 |
 | `report.py` | 生成 HTML 报告 |
-| `install.vbs` | 注册开机启动（双击运行） |
-| `uninstall.vbs` | 移除开机启动 |
+| `install_tray.bat` | 注册开机启动（计划任务方式，双击运行） |
+| `uninstall_tray.bat` | 移除开机启动 |
 | `test.bat` | 用 mock 数据测试浮窗（不影响"今日已读"） |
 | `run_today.bat` | 立即拉真实数据并显示浮窗 |
 | `state.json` | 记录"今日已读"，自动生成 |
@@ -17,7 +17,7 @@
 
 ## 使用
 1. 双击 `test.bat` —— 应该看到右下角弹出红色浮窗"今日 3 只新股可申购 · 🔥 1 只大肉签"。点击它会在浏览器打开报告。报告关掉后浮窗也消失。
-2. 满意后双击 `install.vbs` —— 注册开机启动。
+2. 满意后双击 `install_tray.bat` —— 注册开机启动（推荐托盘常驻版，见下文）。
 3. 之后每次开机：
    - 今天没新股 → 静默退出，桌面无任何变化
    - 已经看过/标"不再提醒" → 静默退出
@@ -81,16 +81,17 @@ INCLUDE_BJ = False
 |---|---|
 | `tray.py` | 托盘常驻入口（复用 `fetcher`/`report`/旧 `Floater`） |
 | `tray_test.bat` | mock 数据测试托盘（`--mock --force`，带控制台，关窗口即结束） |
-| `install_tray.vbs` | 把开机启动换成托盘常驻版（覆盖旧 `main.py` 启动项） |
+| `install_tray.bat` / `install_tray.ps1` | 注册开机启动（计划任务方式，下次登录自动启动） |
+| `uninstall_tray.bat` / `uninstall_tray.ps1` | 移除开机启动 |
 
 ### 使用
 1. 双击 `tray_test.bat` 体验：右下角出现"申"图标，右键里切换三种提示方式、点"立即检查"看效果。
-2. 满意后双击 `install_tray.vbs` 注册开机启动（自动覆盖旧的 `main.py` 启动项，不会重复启动）。
-3. 卸载同样用 `uninstall.vbs`。
+2. 满意后双击 `install_tray.bat` 注册开机启动。脚本会**自动探测 pythonw.exe 路径**、注册计划任务，并立即启动一次（无需管理员权限）。
+
+### 为什么用"计划任务"而不是 Startup 文件夹？
+早期版本把启动脚本放进 Windows 的"启动"文件夹，但实测**它并不保证每次登录都执行**（同一台机器上有时灵、有时不灵）。改用**计划任务（登录时触发 + 延迟 30 秒）**后由系统调度保证执行，并且延迟 30 秒可避开"开机瞬间任务栏托盘区还没就绪导致程序静默退出"的竞态问题。
+
+> 排障：仓库根目录会生成 `tray.log`（程序生命周期/崩溃日志，已被 `.gitignore` 忽略）。若怀疑没启动，查看任务计划程序里的 `IPO_Alert_Tray` 任务，或读 `tray.log` 最后几行即可定位卡在哪一步。
 
 ## 卸载
-双击 `uninstall.vbs` 移除 .vbs 启动项；如果是用 PowerShell .lnk 方式注册的，运行：
-```
-Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\IPO_Alert.lnk"
-```
-文件夹整体删除即彻底卸载。
+双击 `uninstall_tray.bat` 即可删除计划任务并清理残留启动项。文件夹整体删除即彻底卸载。
