@@ -31,19 +31,26 @@ if (-not $exe) {
 Write-Host "Python:   $exe"
 Write-Host "脚本目录: $dir"
 
-# 3. 注册计划任务: 登录后延迟 30 秒启动 (避开开机时托盘区未就绪的竞态)
+# 3. 注册计划任务: 两个触发器双保险
+#    - 登录后延迟 30 秒启动 (避开开机时托盘区未就绪的竞态)
+#    - 每天 08:55 兜底启动: 即使整天不重新登录(睡眠唤醒/连续不注销),
+#      或上一轮常驻进程已被关机终止, 早上也能可靠拉起 -> 根治"申购没出现"
+#    MultipleInstances=IgnoreNew: 进程还活着时每日触发被忽略, 不会开出第二个图标;
+#                                 进程已死时才会成功拉起一个新的。
 $action  = New-ScheduledTaskAction -Execute $exe -Argument "tray.py" -WorkingDirectory $dir
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-$trigger.Delay = "PT30S"
+$tLogon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+$tLogon.Delay = "PT30S"
+$tDaily = New-ScheduledTaskTrigger -Daily -At 8:55am
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) `
-    -RestartCount 2 -RestartInterval (New-TimeSpan -Minutes 1)
+    -RestartCount 2 -RestartInterval (New-TimeSpan -Minutes 1) `
+    -MultipleInstances IgnoreNew
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" `
     -LogonType Interactive -RunLevel Limited
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $tLogon,$tDaily `
     -Settings $settings -Principal $principal `
-    -Description "新股申购提醒托盘 - 登录30秒后启动" -Force | Out-Null
+    -Description "新股申购提醒托盘 - 登录30秒后启动 + 每天08:55兜底" -Force | Out-Null
 
 # 4. 清理旧的 Startup 文件夹启动项(若存在), 避免双开
 $oldVbs = Join-Path ([Environment]::GetFolderPath("Startup")) "IPO_Alert.vbs"

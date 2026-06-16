@@ -391,9 +391,30 @@ def _wait_for_tray(timeout_s: int = 120) -> bool:
     return False
 
 
+def _acquire_single_instance() -> bool:
+    """单实例锁: 现有登录触发、每日兜底触发、手动启动等多条路径都可能拉起本程序,
+    用 Windows 命名互斥量保证只有第一个进程存活, 后来者直接退出 -> 不会出现两个托盘图标。
+    返回 True 表示拿到锁(应继续运行); False 表示已有实例在跑(应退出)。
+    互斥量句柄故意不关闭, 进程退出时由系统释放。"""
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.CreateMutexW(None, False, "Global\\IPO_Alert_Tray_SingleInstance")
+        ERROR_ALREADY_EXISTS = 183
+        if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+            return False
+    except Exception:
+        _log("单实例锁创建失败(忽略, 继续运行):\n" + traceback.format_exc())
+    return True
+
+
 def run():
     use_mock = "--mock" in sys.argv
     force = "--force" in sys.argv
+
+    if not _acquire_single_instance():
+        _log("已有实例在运行, 本次启动退出 (单实例锁)")
+        return
 
     app = QtWidgets.QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
